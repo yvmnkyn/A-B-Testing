@@ -5,9 +5,19 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from logs import *
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logging.basicConfig
+logger = logging.getLogger("MAB Application")
+
+
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+ch.setFormatter(CustomFormatter())
+
+logger.addHandler(ch)
 
 
 class Bandit(ABC):
