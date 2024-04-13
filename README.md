@@ -34,7 +34,7 @@ The project is organized as follows:
 1. Clone the repository:
 
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/yvmnkyn/A-B-Testing.git
     ```
 
 2. Navigate to the `codes` directory:
