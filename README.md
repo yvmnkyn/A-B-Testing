@@ -1,6 +1,8 @@
 # A-B-Testing
 
-This repository contains Python code implementing two popular algorithms: Epsilon-Greedy and Thompson Sampling. It also includes visualization and reporting functions to analyze the performance of these algorithms.
+This repository contains Python code implementing two algorithms: Epsilon-Greedy and Thompson Sampling. 
+
+It also includes visualization and reporting functions to analyze the performance of these algorithms.
 
 ## Project Structure
 
