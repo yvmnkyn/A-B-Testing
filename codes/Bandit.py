@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -286,7 +287,15 @@ class Visualization:
             epsilon_greedy_rewards (list): Rewards obtained from Epsilon-Greedy bandit.
             thompson_rewards (list): Rewards obtained from Thompson Sampling bandit.
         """
-        with open('bandit_rewards.csv', mode='w', newline='') as csv_file:
+        # Specify the path to the "results" folder located outside of the "codes" folder
+        results_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "results")
+        os.makedirs(results_dir, exist_ok=True)  # Create the "results" folder if it doesn't exist
+
+        # Specify the path to the CSV file within the "results" folder
+        csv_file_path = os.path.join(results_dir, 'bandit_rewards.csv')
+
+        # Write rewards to the CSV file
+        with open(csv_file_path, mode='w', newline='') as csv_file:
             fieldnames = ['Bandit', 'Reward', 'Algorithm']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             writer.writeheader()
@@ -329,5 +338,5 @@ if __name__ == "__main__":
     vis = Visualization()
     vis.plot_learning_process(epsilon_greedy_rewards, thompson_rewards)
     vis.plot_cumulative_rewards(epsilon_greedy_rewards, thompson_rewards)
-    # vis.store_rewards_to_csv(epsilon_greedy_rewards, thompson_rewards)
+    vis.store_rewards_to_csv(epsilon_greedy_rewards, thompson_rewards)
     vis.report_cumulative_reward_and_regret(epsilon_greedy_rewards, thompson_rewards)
