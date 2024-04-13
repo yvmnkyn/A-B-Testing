@@ -1,41 +1,244 @@
-"""
-  Run this file at first, in order to see what is it printng. Instead of the print() use the respective log level
-"""
-############################### LOGGER
-from abc import ABC, abstractmethod
 import logging
-import matplotlib.pyplot as plt
-import numpy as np 
-import csv
 import random
+from abc import ABC, abstractmethod
+import csv
+import numpy as np
+import matplotlib.pyplot as plt
 
-logging.basicConfig()
-logger = logging.getLogger("MAB Application")
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-logger.addHandler(ch)
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class Bandit(ABC):
+    """
+    Abstract base class for bandit algorithms.
+    """
     @abstractmethod
     def __init__(self, p):
+        """
+        Initializes the Bandit object.
+
+        Args:
+            p (list): The true mean rewards of each arm.
+        """
+        self.true_means = p
+        self.estimated_means = [0.0] * len(p)
+        self.action_counts = [0] * len(p)
+
+    @abstractmethod
+    def __repr__(self):
+        """
+        Returns a string representation of the Bandit object.
+        """
         pass
 
     @abstractmethod
     def pull(self):
+        """
+        Chooses an arm to pull based on the bandit's strategy.
+
+        Returns:
+            int: The index of the chosen arm.
+        """
         pass
 
     @abstractmethod
-    def update(self):
+    def update(self, arm, reward):
+        """
+        Updates the estimated mean reward of the chosen arm.
+
+        Args:
+            arm (int): The index of the chosen arm.
+            reward (float): The reward received from pulling the arm.
+        """
         pass
 
     @abstractmethod
-    def experiment(self):
+    def experiment(self, num_trials):
+        """
+        Runs an experiment for a specified number of trials.
+
+        Args:
+            num_trials (int): The number of trials to run the experiment for.
+
+        Returns:
+            list: A list of rewards obtained during the experiment.
+        """
         pass
+
+    @abstractmethod
+    def report(self):
+        """
+        Generates a report on the bandit's performance.
+
+        Returns:
+            str: A report containing average reward and regret.
+        """
+        pass
+
+
+class EpsilonGreedy(Bandit):
+    """
+    Epsilon-greedy bandit algorithm.
+    """
+    def __init__(self, p, epsilon=0.1):
+        """
+        Initializes the EpsilonGreedy object.
+
+        Args:
+            p (list): The true mean rewards of each arm.
+            epsilon (float): The epsilon value for the epsilon-greedy algorithm.
+        """
+        super().__init__(p)
+        self.epsilon = epsilon
+
+    def __repr__(self):
+        """
+        Returns a string representation of the EpsilonGreedy object.
+        """
+        return f"EpsilonGreedy Bandit with epsilon={self.epsilon}"
+
+    def pull(self):
+        """
+        Chooses an arm to pull using the epsilon-greedy strategy.
+
+        Returns:
+            int: The index of the chosen arm.
+        """
+        if random.random() < self.epsilon:
+            return random.randint(0, len(self.true_means) - 1)
+        else:
+            return self.estimated_means.index(max(self.estimated_means))
+
+    def update(self, arm, reward):
+        """
+        Updates the estimated mean reward of the chosen arm.
+
+        Args:
+            arm (int): The index of the chosen arm.
+            reward (float): The reward received from pulling the arm.
+        """
+        self.action_counts[arm] += 1
+        n = self.action_counts[arm]
+        self.estimated_means[arm] += (1 / n) * (reward - self.estimated_means[arm])
+
+    def experiment(self, num_trials):
+        """
+        Runs an experiment for a specified number of trials.
+
+        Args:
+            num_trials (int): The number of trials to run the experiment for.
+
+        Returns:
+            list: A list of rewards obtained during the experiment.
+        """
+        rewards = []
+        for t in range(1, num_trials + 1):
+            self.epsilon = 1 / t  # Decay epsilon
+            arm = self.pull()
+            reward = self.true_means[arm]
+            self.update(arm, reward)
+            rewards.append(reward)
+        return rewards
+
+    def report(self):
+        """
+        Generates a report on the bandit's performance.
+
+        Returns:
+            str: A report containing average reward and regret.
+        """
+        avg_reward = sum(self.estimated_means) / len(self.estimated_means)
+        avg_regret = max(self.true_means) - avg_reward
+        return f"EpsilonGreedy Results: Average Reward={avg_reward:.2f}, Average Regret={avg_regret:.2f}"
+
+
+class ThompsonSampling(Bandit):
+    """
+    Thompson Sampling bandit algorithm.
+    """
+    def __init__(self, p):
+        """
+        Initializes the ThompsonSampling object.
+
+        Args:
+            p (list): The true mean rewards of each arm.
+        """
+        super().__init__(p)
+        self.alpha = [1] * len(p)
+        self.beta = [1] * len(p)
+
+    def __repr__(self):
+        """
+        Returns a string representation of the ThompsonSampling object.
+        """
+        return "ThompsonSampling Bandit"
+
+    def pull(self):
+        """
+        Chooses an arm to pull using the Thompson Sampling strategy.
+
+        Returns:
+            int: The index of the chosen arm.
+        """
+        sampled_means = [random.betavariate(alpha, beta) for alpha, beta in zip(self.alpha, self.beta)]
+        return sampled_means.index(max(sampled_means))
+
+    def update(self, arm, reward):
+        """
+        Updates the parameters of the chosen arm based on the received reward.
+
+        Args:
+            arm (int): The index of the chosen arm.
+            reward (int): The reward received from pulling the arm.
+        """
+        if reward == 1:
+            self.alpha[arm] += 1
+        else:
+            self.beta[arm] += 1
+
+    def experiment(self, num_trials):
+        """
+        Runs the Thompson Sampling experiment for a specified number of trials.
+
+        Args:
+            num_trials (int): The number of trials to run the experiment for.
+
+        Returns:
+            list: A list of rewards obtained during the experiment.
+        """
+        rewards = []
+        for _ in range(num_trials):
+            arm = self.pull()
+            reward = self.true_means[arm]
+            self.update(arm, reward)
+            rewards.append(reward)
+        return rewards
+
+    def report(self):
+        """
+        Generates a report on the bandit's performance.
+
+        Returns:
+            str: A report containing average reward and regret.
+        """
+        avg_reward = sum(self.alpha) / (sum(self.alpha) + sum(self.beta))
+        avg_regret = max(self.true_means) - avg_reward
+        return f"ThompsonSampling Results: Average Reward={avg_reward:.2f}, Average Regret={avg_regret:.2f}"
 
 
 class Visualization:
-    def plot_cumulative_rewards(self, epsilon_greedy_rewards, thompson_rewards):
+    """
+    Class for visualizing bandit algorithms.
+    """
+    def plot_learning_process(self, epsilon_greedy_rewards, thompson_rewards):
+        """
+        Plot the learning process of Epsilon-Greedy and Thompson Sampling bandits.
+
+        Args:
+            epsilon_greedy_rewards (list): Rewards obtained from Epsilon-Greedy bandit.
+            thompson_rewards (list): Rewards obtained from Thompson Sampling bandit.
+        """
         plt.figure(figsize=(12, 6))
         plt.subplot(1, 2, 1)
         cumulative_epsilon_greedy_rewards = np.cumsum(epsilon_greedy_rewards)
@@ -55,7 +258,14 @@ class Visualization:
 
         plt.show()
 
-    def plot_cumulative_rewards_simple(self, epsilon_greedy_rewards, thompson_rewards):
+    def plot_cumulative_rewards(self, epsilon_greedy_rewards, thompson_rewards):
+        """
+        Plot the cumulative rewards of Epsilon-Greedy and Thompson Sampling bandits.
+
+        Args:
+            epsilon_greedy_rewards (list): Rewards obtained from Epsilon-Greedy bandit.
+            thompson_rewards (list): Rewards obtained from Thompson Sampling bandit.
+        """
         plt.figure(figsize=(10, 5))
         cumulative_epsilon_greedy_rewards = np.cumsum(epsilon_greedy_rewards)
         cumulative_thompson_rewards = np.cumsum(thompson_rewards)
@@ -69,6 +279,13 @@ class Visualization:
         plt.show()
 
     def store_rewards_to_csv(self, epsilon_greedy_rewards, thompson_rewards):
+        """
+        Store rewards to a CSV file.
+
+        Args:
+            epsilon_greedy_rewards (list): Rewards obtained from Epsilon-Greedy bandit.
+            thompson_rewards (list): Rewards obtained from Thompson Sampling bandit.
+        """
         with open('bandit_rewards.csv', mode='w', newline='') as csv_file:
             fieldnames = ['Bandit', 'Reward', 'Algorithm']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -81,6 +298,13 @@ class Visualization:
                 writer.writerow({'Bandit': 'ThompsonSampling', 'Reward': reward, 'Algorithm': 'Thompson Sampling'})
 
     def report_cumulative_reward_and_regret(self, epsilon_greedy_rewards, thompson_rewards):
+        """
+        Generate a report of cumulative reward and regret.
+
+        Args:
+            epsilon_greedy_rewards (list): Rewards obtained from Epsilon-Greedy bandit.
+            thompson_rewards (list): Rewards obtained from Thompson Sampling bandit.
+        """
         cumulative_epsilon_greedy_reward = sum(epsilon_greedy_rewards)
         cumulative_thompson_reward = sum(thompson_rewards)
         cumulative_epsilon_greedy_regret = max(Bandit_Reward) * len(epsilon_greedy_rewards) - cumulative_epsilon_greedy_reward
@@ -92,95 +316,18 @@ class Visualization:
         logger.info(f'Cumulative Regret - Thompson Sampling: {cumulative_thompson_regret}')
 
 
-class EpsilonGreedy(Bandit):
-    def __init__(self, p, epsilon=0.1):
-        super().__init__(p)
-        self.epsilon = epsilon
-        self.estimates = [0] * len(p)
-        self.bandit_rewards = p
-
-    def pull(self):
-        if random.random() < self.epsilon:
-            return random.randint(0, len(self.bandit_rewards) - 1)
-        else:
-            return np.argmax(self.estimates)
-
-    def update(self, chosen_bandit, reward):
-        self.num_trials += 1
-        self.total_reward += reward
-        self.estimates[chosen_bandit] += (reward - self.estimates[chosen_bandit]) / (self.num_trials)
-
-    def experiment(self, num_trials):
-        rewards = []
-        for _ in range(num_trials):
-            chosen_bandit = self.pull()
-            reward = self.bandit_rewards[chosen_bandit]
-            self.update(chosen_bandit, reward)
-            rewards.append(reward)
-        return rewards
-
-
-class ThompsonSampling(Bandit):
-    def __init__(self, rewards, alpha=1, beta=1):
-        super().__init__(rewards)
-        self.alpha = alpha
-        self.beta = beta
-        self.posteriors = [(alpha, beta) for _ in rewards]
-
-    def pull(self):
-        sampled_values = [np.random.beta(alpha, beta) for alpha, beta in self.posteriors]
-        return np.argmax(sampled_values)
-
-    def update(self, chosen_bandit, reward):
-        self.num_trials += 1
-        self.total_reward += reward
-        alpha, beta = self.posteriors[chosen_bandit]
-        self.posteriors[chosen_bandit] = (alpha + reward, beta + 1 - reward)
-
-    def experiment(self, num_trials):
-        rewards = []
-        for _ in range(num_trials):
-            chosen_bandit = self.pull()
-            reward = self.bandit_rewards[chosen_bandit]
-            self.update(chosen_bandit, reward)
-            rewards.append(reward)
-        return rewards
-
-
-def comparison(num_trials):
-    # Initialize bandit rewards
+if __name__ == "__main__":
     Bandit_Reward = [1, 2, 3, 4]
+    num_trials = 20000
 
-    # Initialize bandit instances
     epsilon_greedy_bandit = EpsilonGreedy(Bandit_Reward)
-    thompson_bandit = ThompsonSampling(Bandit_Reward)
-
-    # Run experiments
     epsilon_greedy_rewards = epsilon_greedy_bandit.experiment(num_trials)
+
+    thompson_bandit = ThompsonSampling(Bandit_Reward)
     thompson_rewards = thompson_bandit.experiment(num_trials)
 
-    # Visualize results
     vis = Visualization()
+    vis.plot_learning_process(epsilon_greedy_rewards, thompson_rewards)
     vis.plot_cumulative_rewards(epsilon_greedy_rewards, thompson_rewards)
-    vis.plot_cumulative_rewards_simple(epsilon_greedy_rewards, thompson_rewards)
-
-    # Store rewards to CSV
     # vis.store_rewards_to_csv(epsilon_greedy_rewards, thompson_rewards)
-
-    # Report cumulative reward and regret
     vis.report_cumulative_reward_and_regret(epsilon_greedy_rewards, thompson_rewards)
-
-
-# Call the comparison function with the desired number of trials
-comparison(20000)
-
-
-
-
-if __name__=='__main__':
-   
-    logger.debug("debug message")
-    logger.info("info message")
-    logger.warning("warning message")
-    logger.error("error message")
-    logger.critical("critical message")
